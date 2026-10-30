@@ -152,22 +152,26 @@ bot.on('callback_query', async (query) => {
         return bot.sendMessage(chatId, "❌ Ошибка ffmpeg. Возможно, файл поврежден.");
       }
 
-      try {
-        // Отправляем как АУДИО (с плеером)
-        await bot.sendAudio(chatId, outputPath, {
-          title: `Track [${effectName}]`,
-          performer: "Audio Bot",
-          caption: `✅ Готово: *${effectName}*`,
-          parse_mode: "Markdown"
-        });
-        
-        bot.editMessageText(`✅ Готово: *${effectName}*`, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" });
-      } catch (sendErr) {
-        console.error("Ошибка отправки:", sendErr);
-        bot.sendMessage(chatId, "❌ Ошибка при отправке готового файла. " + sendErr.message);
-      } finally {
-        if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-      }
+      // Ждем 1 секунду, чтобы файловая система точно записала файл на диск
+      setTimeout(async () => {
+        try {
+          // Принудительно отправляем как поток (createReadStream)
+          await bot.sendAudio(chatId, fs.createReadStream(outputPath), {
+            title: `Track [${effectName}]`,
+            performer: "Audio Bot",
+            caption: `✅ Готово: *${effectName}*`,
+            parse_mode: "Markdown"
+          });
+          
+          bot.editMessageText(`✅ Готово: *${effectName}*`, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" });
+        } catch (sendErr) {
+          console.error("Ошибка отправки:", sendErr);
+          bot.sendMessage(chatId, "❌ Ошибка при отправке готового файла. " + sendErr.message);
+        } finally {
+          if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+        }
+      }, 1000); // Задержка 1 секунда
+      
     });
   } catch (e) {
     console.error(e);
