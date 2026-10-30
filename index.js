@@ -14,29 +14,21 @@ const app = express();
 app.get('/', (req, res) => res.send('Bot is alive!'));
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
-// Скачиваем ffmpeg (надежное зеркало)
+// Скачиваем ffmpeg по НОВОЙ рабочей ссылке
 const ffmpegPath = path.join(__dirname, 'ffmpeg');
 if (!fs.existsSync(ffmpegPath)) {
   console.log("Downloading ffmpeg...");
   const file = fs.createWriteStream(ffmpegPath);
-  https.get('https://github.com/eugeneware/ffmpeg-static/releases/download/b5.0.1/ffmpeg-linux-x64', (response) => {
-    if (response.statusCode === 302 || response.statusCode === 301) {
-       https.get(response.headers.location, (res) => {
-           res.pipe(file);
-           file.on('finish', () => {
-             file.close();
-             fs.chmodSync(ffmpegPath, '755');
-             console.log("ffmpeg downloaded!");
-           });
-       });
-    } else {
-       response.pipe(file);
-       file.on('finish', () => {
-         file.close();
-         fs.chmodSync(ffmpegPath, '755');
-         console.log("ffmpeg downloaded!");
-       });
-    }
+  // Используем другой репозиторий, где ссылки стабильные
+  https.get('https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-linux-x64', (response) => {
+    response.pipe(file);
+    file.on('finish', () => {
+      file.close();
+      fs.chmodSync(ffmpegPath, '755');
+      console.log("ffmpeg downloaded!");
+    });
+  }).on('error', (err) => {
+    console.log("Ошибка скачивания ffmpeg: ", err.message);
   });
 }
 
