@@ -14,12 +14,11 @@ const app = express();
 app.get('/', (req, res) => res.send('Bot is alive!'));
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
-// Скачиваем ffmpeg по НОВОЙ рабочей ссылке
+// Скачиваем ffmpeg
 const ffmpegPath = path.join(__dirname, 'ffmpeg');
 if (!fs.existsSync(ffmpegPath)) {
   console.log("Downloading ffmpeg...");
   const file = fs.createWriteStream(ffmpegPath);
-  // Используем другой репозиторий, где ссылки стабильные
   https.get('https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-linux-x64', (response) => {
     response.pipe(file);
     file.on('finish', () => {
@@ -109,19 +108,19 @@ bot.on('callback_query', async (query) => {
 
   if (data === "fx:reverb") {
     effectName = "🌊 Reverb";
-    filterArgs = ['-filter:a', 'aecho=0.8:0.88:60:0.4'];
+    filterArgs = ['-af', 'aecho=0.8:0.88:60:0.4'];
   } else if (data === "fx:8d") {
     effectName = "🎧 8D";
-    filterArgs = ['-filter:a', 'apulsator=hz=0.08,aecho=0.8:0.9:1000:0.3'];
+    filterArgs = ['-af', 'apulsator=hz=0.08,aecho=0.8:0.9:1000:0.3'];
   } else if (data.startsWith("fx:spd_")) {
     const val = parseFloat(data.split('_')[1]) / 100;
     effectName = `⚡ Speed Up ${val}x`;
-    filterArgs = ['-filter:a', `atempo=${val}`];
+    filterArgs = ['-af', `atempo=${val}`];
   } else if (data.startsWith("fx:slw_")) {
     const val = parseFloat(data.split('_')[1]) / 100;
     effectName = `🐢 Slowed ${val}x`;
     const setrate = Math.round(44100 * val);
-    filterArgs = ['-filter:a', `asetrate=${setrate},aresample=44100,atempo=0.95,aecho=0.8:0.9:1000:0.3`];
+    filterArgs = ['-af', `asetrate=${setrate},aresample=44100,atempo=0.95,aecho=0.8:0.9:1000:0.3`];
   } else {
     return bot.answerCallbackQuery(query.id, "Неизвестный эффект");
   }
@@ -138,11 +137,13 @@ bot.on('callback_query', async (query) => {
     const inputPath = `/tmp/${timestamp}_in${fileData.ext}`;
     const outputPath = `/tmp/${timestamp}_out.mp3`;
 
+    // Скачиваем исходник
     const response = await fetch(fileLink);
     const arrayBuffer = await response.arrayBuffer();
     fs.writeFileSync(inputPath, Buffer.from(arrayBuffer));
 
-    execFile(ffmpegPath, ['-y', '-i', inputPath, '-vn', ...filterArgs, '-b:a', '192k', outputPath], async (err) => {
+    // Запускаем ffmpeg (формат mp3, битрейт 128k)
+    execFile(ffmpegPath, ['-y', '-i', inputPath, '-vn', ...filterArgs, '-b:a', '128k', '-f', 'mp3', outputPath], async (err) => {
       
       if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
 
@@ -152,11 +153,18 @@ bot.on('callback_query', async (query) => {
       }
 
       try {
-        await bot.sendAudio(chatId, outputPath, { title: `Track [${effectName}]` });
+        // Отправляем как АУДИО (с плеером)
+        await bot.sendAudio(chatId, outputPath, {
+          title: `Track [${effectName}]`,
+          performer: "Audio Bot",
+          caption: `✅ Готово: *${effectName}*`,
+          parse_mode: "Markdown"
+        });
+        
         bot.editMessageText(`✅ Готово: *${effectName}*`, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" });
       } catch (sendErr) {
         console.error("Ошибка отправки:", sendErr);
-        bot.sendMessage(chatId, "❌ Ошибка при отправке готового файла.");
+        bot.sendMessage(chatId, "❌ Ошибка при отправке готового файла. " + sendErr.message);
       } finally {
         if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
       }
