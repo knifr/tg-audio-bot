@@ -2,6 +2,6 @@ services:
   - type: web
     name: tg-audio-bot
     env: node
-    buildCommand: npm install
-    startCommand: node index.js
     plan: free
+    buildCommand: npm install && wget https://github.com/eugeneware/ffmpeg-static/releases/download/b5.0.1/ffmpeg-linux-x64 -O ffmpeg && chmod +x ffmpeg
+    startCommand: node index.js
