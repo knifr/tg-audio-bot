@@ -134,44 +134,44 @@ bot.on('callback_query', async (query) => {
   try {
     const fileLink = await bot.getFileLink(fileData.fileId);
     const timestamp = Date.now();
-    const inputPath = `/tmp/${timestamp}_in${fileData.ext}`;
-    const outputPath = `/tmp/${timestamp}_out.mp3`;
+    
+    // СОХРАНЯЕМ В ПАПКУ ПРОЕКТА, А НЕ В /tmp
+    const inputPath = path.join(__dirname, `${timestamp}_in${fileData.ext}`);
+    const outputPath = path.join(__dirname, `${timestamp}_out.mp3`);
 
-    // Скачиваем исходник
     const response = await fetch(fileLink);
     const arrayBuffer = await response.arrayBuffer();
     fs.writeFileSync(inputPath, Buffer.from(arrayBuffer));
 
-    // Запускаем ffmpeg (формат mp3, битрейт 128k)
     execFile(ffmpegPath, ['-y', '-i', inputPath, '-vn', ...filterArgs, '-b:a', '128k', '-f', 'mp3', outputPath], async (err) => {
       
       if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
 
       if (err) {
-        console.error(err);
+        console.error("FFMPEG ERROR:", err);
         return bot.sendMessage(chatId, "❌ Ошибка ffmpeg. Возможно, файл поврежден.");
       }
 
-      // Ждем 1 секунду, чтобы файловая система точно записала файл на диск
-      setTimeout(async () => {
-        try {
-          // Принудительно отправляем как поток (createReadStream)
-          await bot.sendAudio(chatId, fs.createReadStream(outputPath), {
-            title: `Track [${effectName}]`,
-            performer: "Audio Bot",
-            caption: `✅ Готово: *${effectName}*`,
-            parse_mode: "Markdown"
-          });
-          
-          bot.editMessageText(`✅ Готово: *${effectName}*`, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" });
-        } catch (sendErr) {
-          console.error("Ошибка отправки:", sendErr);
-          bot.sendMessage(chatId, "❌ Ошибка при отправке готового файла. " + sendErr.message);
-        } finally {
-          if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-        }
-      }, 1000); // Задержка 1 секунда
-      
+      // Проверяем, создался ли файл
+      if (!fs.existsSync(outputPath)) {
+         return bot.sendMessage(chatId, "❌ Ошибка: выходной файл не был создан.");
+      }
+
+      try {
+        await bot.sendAudio(chatId, fs.createReadStream(outputPath), {
+          title: `Track [${effectName}]`,
+          performer: "Audio Bot",
+          caption: `✅ Готово: *${effectName}*`,
+          parse_mode: "Markdown"
+        });
+        
+        bot.editMessageText(`✅ Готово: *${effectName}*`, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" });
+      } catch (sendErr) {
+        console.error("Ошибка отправки:", sendErr);
+        bot.sendMessage(chatId, "❌ Ошибка при отправке готового файла. " + sendErr.message);
+      } finally {
+        if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+      }
     });
   } catch (e) {
     console.error(e);
