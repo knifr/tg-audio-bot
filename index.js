@@ -122,10 +122,11 @@ bot.on('callback_query', async (query) => {
     const setrate = Math.round(44100 * val);
     filterArgs = ['-af', `asetrate=${setrate},aresample=44100,atempo=0.95,aecho=0.8:0.9:1000:0.3`];
   } else {
-    return bot.answerCallbackQuery(query.id, "Неизвестный эффект");
+    return bot.answerCallbackQuery(query.id, { text: "Неизвестный эффект" });
   }
 
-  bot.answerCallbackQuery(query.id, "Обрабатываю...");
+  // ИСПРАВЛЕННЫЙ СИНТАКСИС ТУТ
+  bot.answerCallbackQuery(query.id, { text: "Обрабатываю..." });
   bot.editMessageText(`⏳ *${effectName}*...`, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" });
 
   const fileData = bot.fileCache?.[chatId];
@@ -135,7 +136,6 @@ bot.on('callback_query', async (query) => {
     const fileLink = await bot.getFileLink(fileData.fileId);
     const timestamp = Date.now();
     
-    // СОХРАНЯЕМ В ПАПКУ ПРОЕКТА, А НЕ В /tmp
     const inputPath = path.join(__dirname, `${timestamp}_in${fileData.ext}`);
     const outputPath = path.join(__dirname, `${timestamp}_out.mp3`);
 
@@ -152,7 +152,6 @@ bot.on('callback_query', async (query) => {
         return bot.sendMessage(chatId, "❌ Ошибка ffmpeg. Возможно, файл поврежден.");
       }
 
-      // Проверяем, создался ли файл
       if (!fs.existsSync(outputPath)) {
          return bot.sendMessage(chatId, "❌ Ошибка: выходной файл не был создан.");
       }
